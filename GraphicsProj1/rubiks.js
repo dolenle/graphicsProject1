@@ -49,7 +49,8 @@ const up = vec3(0.0, 1.0, 0.0);
 //-----------NEW STUFF-------------------------------------------------------------------------------------
 
 var rubiks = [];
-var colorIndices = [];
+var animationQueue = [];
+var animSpeed = 3;
 
 var cubeColors = [
 	vec4( 0.1, 0.1, 0.1, 1.0 ), //black
@@ -109,6 +110,9 @@ function Cube(position, colors) {
 	this.origin = position;
 	this.angle = [0, 0, 0];
 	this.colors = colors;
+	this.target = [0, 0, 0];
+	this.direction = 0;
+	this.axis = 0;
 }
 
 Cube.prototype.draw = function(x, y, z) {
@@ -139,21 +143,36 @@ Cube.prototype.draw = function(x, y, z) {
     gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer);
 	//gl.bufferSubData(gl.ARRAY_BUFFER, 0, flatten(colorsArray));
 	gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.DYNAMIC_DRAW );
-	
-    //gl.vertexAttribPointer( vColor, 4, gl.FLOAT, false, 0, 0 );
-    //gl.enableVertexAttribArray( vColor);
 
     gl.bindBuffer( gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData( gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW );
-    
-    gl.vertexAttribPointer( vPosition, 4, gl.FLOAT, false, 0, 0 );
-    //gl.enableVertexAttribArray( vPosition );
 
 	setMatrixUniforms();
 	gl.drawArrays( gl.TRIANGLES, 0, NumVertices );
 
 	modelViewMatrix = tempMV;
 }
+
+	var effectiveFPMS = 60 / 1000;
+    Cube.prototype.animate = function(elapsedTime) {
+    	var animAngle = animSpeed * Math.round(effectiveFPMS * elapsedTime);
+    	//for(var i in this.target) {
+			if(this.target[this.axis] != 0) {
+				this.angle[this.axis] += animAngle * this.direction;
+				this.target[this.axis] -= animAngle;
+			} else {
+				//this.target[i] = 0;
+				this.angle[this.axis] = this.angle[this.axis]%360;
+				this.direction=0;
+			}
+        //}
+    };
+    
+    var lastTime = 0;
+    
+    
+
+
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
 
 function quad(a, b, c, d) {
@@ -208,6 +227,7 @@ window.onload = function init() {
     gl.useProgram( program );
     
     colorCube();
+    testCube();
 
     cBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer);
@@ -228,7 +248,7 @@ window.onload = function init() {
     
     modelViewMatrixLoc = gl.getUniformLocation( program, "modelViewMatrix" );
     projectionMatrixLoc = gl.getUniformLocation( program, "projectionMatrix" );
-	testCube();
+    
 	setupUI();
     render();
 }
@@ -266,6 +286,14 @@ function setupUI() {
     document.getElementById( "zButton" ).onclick = function () {
         axis = 2;
     };
+    document.getElementById( "tButton" ).onclick = function () {
+		for(var i=18; i<27; i++) {
+			if(rubiks[i].direction == 0) {
+				rubiks[i].target[0]=90;
+				rubiks[i].direction=-1;
+			}
+		}
+    };
 }
 
 var render = function() {
@@ -276,7 +304,7 @@ var render = function() {
     
     modelViewMatrix = lookAt(eye, at , up);
     
-    rot[axis]+=2.0;
+    //rot[axis]+=2.0;
 	//rot[1]+=2.0;
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[0], [1, 0, 0] ));
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[1], [0, 1, 0] ));
@@ -284,13 +312,20 @@ var render = function() {
     
     projectionMatrix = perspective(fovy, aspect, near, far);
 	
-	// for(var i=0; i<9; i++)
-		// rubiks[i].angle[0]++;
-	// for(var i=18; i<27; i++)
-		// rubiks[i].angle[0]--;
     for (var i in rubiks) {
     	rubiks[i].draw(0, 0, 0);
     }
+    
+    //Perform Animations
+    var timeNow = new Date().getTime();
+	if (lastTime != 0) {
+		var elapsed = timeNow - lastTime;
+
+		for (var i in rubiks) {
+			rubiks[i].animate(elapsed);
+		}
+	}
+	lastTime = timeNow;
     requestAnimFrame(render);
 }
 
