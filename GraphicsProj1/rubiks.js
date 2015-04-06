@@ -19,17 +19,6 @@ var vertices = [
 	vec4(  0.2, -0.2, -0.2, 1.0 )
 ];
 
-var vertexColors = [
-    vec4( 0.0, 0.0, 0.0, 1.0 ),  // black
-    vec4( 1.0, 0.0, 0.0, 1.0 ),  // red
-    vec4( 1.0, 1.0, 0.0, 1.0 ),  // yellow
-    vec4( 0.0, 1.0, 0.0, 1.0 ),  // green
-    vec4( 0.0, 0.0, 1.0, 1.0 ),  // blue
-    vec4( 1.0, 0.0, 1.0, 1.0 ),  // magenta
-    vec4( 0.0, 1.0, 1.0, 1.0 ),  // cyan
-    vec4( 1.0, 1.0, 1.0, 1.0 ),  // white
-];
-
 var near = 0.3;
 var far = 5.0;
 var radius = 4.0;
@@ -48,17 +37,26 @@ const up = vec3(0.0, 1.0, 0.0);
 
 //-----------NEW STUFF-------------------------------------------------------------------------------------
 
+var spacing = 0.45;
 var rubiks = [];
-var animationQueue = [];
+var animationQueue = [[]];
 var animSpeed = 3;
 
+var camDirec = [0, 0, 0];
+var camAccel = 1.1;
+var camSpeed = 0.5;
+
+var rows = [[],[],[]]; //rows of the rubiks cube
+var cols = [[],[],[]]; //columns of the cube
+var faces = [[],[],[]];
+
 var cubeColors = [
-	vec4( 0.1, 0.1, 0.1, 1.0 ), //black
+	vec4( 0.2, 0.2, 0.2, 1.0 ), //black
 	vec4( 1.0, 0.0, 0.0, 1.0 ), //red
 	vec4( 1.0, 1.0, 0.0, 1.0 ), //yellow
 	vec4( 0.0, 0.6, 0.0, 1.0 ), //green
 	vec4( 0.0, .0, 0.6, 1.0 ), //blue
-	vec4( 0.96, 0.96, 0.96, 1.0 ), //white
+	vec4( 0.9, 0.9, 0.9, 1.0 ), //white
 	vec4( 1.0, 0.5, 0.0, 1.0 ), //orange
 ];
 
@@ -76,7 +74,7 @@ var axis=0;
 var rot = [0,0,0];
 var tempMV = mat4().create;
 
-function testCube() {
+function rubiksCube() {
 	var index=0;
 	//Color Ordering: [front, right, bottom, top, back, left]
 	var c = [Colors.YELLOW, Colors.GREEN, Colors.RED, Colors.ORANGE, Colors.WHITE, Colors.GREEN];
@@ -86,36 +84,31 @@ function testCube() {
 	var topColors = [Colors.BLACK, Colors.BLACK, Colors.ORANGE];
 	var backColors = [Colors.WHITE, Colors.BLACK, Colors.BLACK];
 	var leftColors = [Colors.BLUE, Colors.BLACK, Colors.BLACK];
-	for(var x=-1; x<=1; x++) {
-		for(var y=-1; y<=1; y++) {
-			for(var z=-1; z<=1; z++) {
-				
-				rubiks.push(new Cube([x*0.45, y*0.45, z*0.45, 1.0],
-					[frontColors[z+1], rightColors[x+1], bottomColors[y+1], topColors[y+1], backColors[z+1], leftColors[x+1]]));
-				// gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer);
-				// for(var k in c) {
-					// for(var i=0; i<=9; i++) {
-						// //colorsArray.push(cubeColors[c]);
-						// gl.bufferSubData(gl.ARRAY_BUFFER, 16*(index+i), flatten(cubeColors[k]));
-					// }
-				// }
-			index++;
+	for(var x=0; x<3; x++) {
+		for(var y=0; y<3; y++) {
+			for(var z=0; z<3; z++) {
+				rubiks.push(new Cube([(x-1)*spacing, (y-1)*spacing, (z-1)*spacing, 1.0],
+					[frontColors[z], rightColors[x], bottomColors[y], topColors[y], backColors[z], leftColors[x]]));
+				cols[x].push(index);
+				rows[y].push(index);
+				faces[z].push(index);
+				index++;
 			}
 		}
 	}
-	console.log("[TestCube]");
+	console.log("[rubiksCube]");
 }
 
 function Cube(position, colors) {
 	this.origin = position;
 	this.angle = [0, 0, 0];
 	this.colors = colors;
-	this.target = [0, 0, 0];
+	this.target = 0;
 	this.direction = 0;
 	this.axis = 0;
 }
 
-Cube.prototype.draw = function(x, y, z) {
+Cube.prototype.render = function(x, y, z) {
 	tempMV = modelViewMatrix;  //backup modelViewMatrix
 	// Move to cube frame
 	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], [1, 0, 0] ));
@@ -157,11 +150,11 @@ Cube.prototype.draw = function(x, y, z) {
     Cube.prototype.animate = function(elapsedTime) {
     	var animAngle = animSpeed * Math.round(effectiveFPMS * elapsedTime);
     	//for(var i in this.target) {
-			if(this.target[this.axis] != 0) {
+			if(this.target != 0) {
 				this.angle[this.axis] += animAngle * this.direction;
-				this.target[this.axis] -= animAngle;
+				this.target -= animAngle;
 			} else {
-				//this.target[i] = 0;
+				//this.target = 0;
 				this.angle[this.axis] = this.angle[this.axis]%360;
 				this.direction=0;
 			}
@@ -176,19 +169,18 @@ Cube.prototype.draw = function(x, y, z) {
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
 
 function quad(a, b, c, d) {
-     pointsArray.push(vertices[a]); 
-     pointsArray.push(vertices[b]); 
-     pointsArray.push(vertices[c]); 
-     pointsArray.push(vertices[a]); 
-     pointsArray.push(vertices[c]); 
-     pointsArray.push(vertices[d]); 
-     colorsArray.push(vertexColors[a]);
-	 colorsArray.push(vertexColors[a]);
-	 colorsArray.push(vertexColors[a]);
-	 colorsArray.push(vertexColors[a]);
-	 colorsArray.push(vertexColors[a]);
-	 colorsArray.push(vertexColors[a]);
-	 
+	pointsArray.push(vertices[a]); 
+	pointsArray.push(vertices[b]); 
+	pointsArray.push(vertices[c]); 
+	pointsArray.push(vertices[a]); 
+	pointsArray.push(vertices[c]); 
+	pointsArray.push(vertices[d]); 
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
+	colorsArray.push(vec4( 0.0, 0.0, 0.0, 1.0 ));
 }
 
 function colorCube()
@@ -227,7 +219,7 @@ window.onload = function init() {
     gl.useProgram( program );
     
     colorCube();
-    testCube();
+    rubiksCube();
 
     cBuffer = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer);
@@ -277,23 +269,41 @@ function setupUI() {
         fovy = event.target.value;
     };
     
-    document.getElementById( "xButton" ).onclick = function () {
-        axis = 0;
-    };
-    document.getElementById( "yButton" ).onclick = function () {
-        axis = 1;
-    };
-    document.getElementById( "zButton" ).onclick = function () {
-        axis = 2;
+    document.getElementById( "resetRot" ).onclick = function () {
+        camDirec =  [0,0,0];
+		rot = [0,0,0];
+		camSpeed = 0.01;
     };
     document.getElementById( "tButton" ).onclick = function () {
-		for(var i=18; i<27; i++) {
-			if(rubiks[i].direction == 0) {
-				rubiks[i].target[0]=90;
-				rubiks[i].direction=-1;
+		for(var i in faces[2]) {
+			var id = faces[2][i];
+			if(rubiks[id].direction == 0) {
+				rubiks[id].axis = 2;
+				rubiks[id].target=90;
+				rubiks[id].direction=-1;
 			}
 		}
     };
+	
+	document.onkeydown = function(event) {
+		switch(event.keyCode) {
+			case 37: //left arrow
+				camDirec[1]-=camSpeed*=camAccel;
+				break;
+			case 38: //up arrow
+				camDirec[0]-=camSpeed*=camAccel;
+				break;
+			case 39: //right arrow
+				camDirec[1]+=camSpeed*=camAccel;
+				break;
+			case 40: //down arrow
+				camDirec[0]+=camSpeed*=camAccel;
+				break;
+		}
+	}
+	document.onkeyup = function() {
+		camSpeed=0.01;
+	}
 }
 
 var render = function() {
@@ -304,8 +314,12 @@ var render = function() {
     
     modelViewMatrix = lookAt(eye, at , up);
     
-    //rot[axis]+=2.0;
-	//rot[1]+=2.0;
+    rot[1]+=camDirec[1];
+	if((rot[0]<90 || camDirec[0]<0) && (rot[0]>-90 || camDirec[0]>0))
+		rot[0]+=camDirec[0];
+	else {
+		camDirec[0]=0;
+	}
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[0], [1, 0, 0] ));
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[1], [0, 1, 0] ));
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[2], [0, 0, 1] ));
@@ -313,14 +327,13 @@ var render = function() {
     projectionMatrix = perspective(fovy, aspect, near, far);
 	
     for (var i in rubiks) {
-    	rubiks[i].draw(0, 0, 0);
+    	rubiks[i].render(0, 0, 0);
     }
     
     //Perform Animations
     var timeNow = new Date().getTime();
 	if (lastTime != 0) {
 		var elapsed = timeNow - lastTime;
-
 		for (var i in rubiks) {
 			rubiks[i].animate(elapsed);
 		}
