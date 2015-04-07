@@ -49,6 +49,7 @@ var camSpeed = 0.5;
 var rows = [[],[],[]]; //rows of the rubiks cube
 var cols = [[],[],[]]; //columns of the cube
 var faces = [[],[],[]];
+var planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
 
 var cubeColors = [
 	vec4( 0.2, 0.2, 0.2, 1.0 ), //black
@@ -87,20 +88,25 @@ function rubiksCube() {
 	for(var x=0; x<3; x++) {
 		for(var y=0; y<3; y++) {
 			for(var z=0; z<3; z++) {
-				rubiks.push(new Cube([(x-1)*spacing, (y-1)*spacing, (z-1)*spacing, 1.0],
+				rubiks.push(new Cube([(x-1)*spacing, (y-1)*spacing, (z-1)*spacing, 1.0], [x, y, z],
 					[frontColors[z], rightColors[x], bottomColors[y], topColors[y], backColors[z], leftColors[x]]));
-				cols[x].push(index);
-				rows[y].push(index);
-				faces[z].push(index);
+				//cols[x].push(index);
+				//rows[y].push(index);
+				//faces[z].push(index);
+				planes[0][x].push(index);
+				planes[1][y].push(index);
+				planes[2][z].push(index);
 				index++;
 			}
 		}
 	}
+	evaluatePlanes();
 	console.log("[rubiksCube]");
 }
 
-function Cube(position, colors) {
+function Cube(position, planes, colors) {
 	this.origin = position;
+	this.curPos = planes;
 	this.angle = [0, 0, 0];
 	this.colors = colors;
 	this.target = 0;
@@ -146,25 +152,76 @@ Cube.prototype.render = function(x, y, z) {
 	modelViewMatrix = tempMV;
 }
 
-	var effectiveFPMS = 60 / 1000;
-    Cube.prototype.animate = function(elapsedTime) {
-    	var animAngle = animSpeed * Math.round(effectiveFPMS * elapsedTime);
-    	//for(var i in this.target) {
-			if(this.target != 0) {
-				this.angle[this.axis] += animAngle * this.direction;
-				this.target -= animAngle;
-			} else {
-				//this.target = 0;
-				this.angle[this.axis] = this.angle[this.axis]%360;
-				this.direction=0;
-			}
-        //}
-    };
+var effectiveFPMS = 60 / 1000;
+Cube.prototype.animate = function(elapsedTime) {
+	var animAngle = animSpeed * Math.round(effectiveFPMS * elapsedTime);
+	//for(var i in this.target) {
+		if(this.target != 0) {
+			this.angle[this.axis] += animAngle * this.direction;
+			this.target -= animAngle;
+		} else {
+			//this.target = 0;
+			this.angle[this.axis] = this.angle[this.axis]%360;
+			this.direction=0;
+		}
+	//}
+};
     
-    var lastTime = 0;
-    
-    
+var lastTime = 0;
 
+//plane: 0=column, 1=row, 2=face
+function makeTurn(p, i, d) { //plane, index, direction
+
+	var p1 = (p+1)%3; //other plane 1
+	var p2 = (p+2)%3; //other plane 2
+	//var tempPlane = new Array(planes[p]);
+	
+	for(var x in planes[p][i]) {
+		var id = planes[p][i][x];
+		if(rubiks[id].direction == 0) {
+			rubiks[id].axis = p;
+			rubiks[id].target=90;
+			rubiks[id].direction=d;
+		}
+		p1Index = rubiks[id].curPos[p1];
+		p2Index = rubiks[id].curPos[p2];
+		if(d=1) {
+			if(p1Index==0) {
+				console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
+				rubiks[id].curPos[p2]=0;
+			}
+			if(p2Index==0) {
+				console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
+				rubiks[id].curPos[p1]=2;
+			}
+			if(p1Index==2) {
+				console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
+				rubiks[id].curPos[p2]=2;
+			}
+			if(p2Index==2) {
+				console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
+				rubiks[id].curPos[p1]=0;
+			}
+		}
+	}
+	
+	evaluatePlanes(); //Refresh plane arrays
+}
+
+function evaluatePlanes() {
+	planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
+	for (var i in rubiks) {
+		planes[0][rubiks[i].curPos[0]].push(i);
+		planes[1][rubiks[i].curPos[1]].push(i);
+		planes[2][rubiks[i].curPos[2]].push(i);
+	}
+	for (var i in planes) {
+		for (var j in planes[i]) {
+			if(planes[i][j].length != 9)
+				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
+		}
+	}
+}
 
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
 
@@ -212,9 +269,7 @@ window.onload = function init() {
     gl.clearColor( 1.0, 1.0, 1.0, 1.0 );
     gl.enable(gl.DEPTH_TEST);
     
-    //
     //  Load shaders and initialize attribute buffers
-    //
     var program = initShaders( gl, "vertex-shader", "fragment-shader" );
     gl.useProgram( program );
     
@@ -273,16 +328,10 @@ function setupUI() {
         camDirec =  [0,0,0];
 		rot = [0,0,0];
 		camSpeed = 0.01;
+		makeTurn(1, 1, 1)
     };
     document.getElementById( "tButton" ).onclick = function () {
-		for(var i in faces[2]) {
-			var id = faces[2][i];
-			if(rubiks[id].direction == 0) {
-				rubiks[id].axis = 2;
-				rubiks[id].target=90;
-				rubiks[id].direction=-1;
-			}
-		}
+		makeTurn(0, 0, 1)
     };
 	
 	document.onkeydown = function(event) {
