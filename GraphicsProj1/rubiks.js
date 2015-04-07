@@ -43,7 +43,7 @@ var animationQueue = [[]];
 var animSpeed = 3;
 
 var camDirec = [0, 0, 0];
-var camAccel = 1.1;
+var camAccel = 1.5;
 var camSpeed = 0.5;
 
 var rows = [[],[],[]]; //rows of the rubiks cube
@@ -90,9 +90,6 @@ function rubiksCube() {
 			for(var z=0; z<3; z++) {
 				rubiks.push(new Cube([(x-1)*spacing, (y-1)*spacing, (z-1)*spacing, 1.0], [x, y, z],
 					[frontColors[z], rightColors[x], bottomColors[y], topColors[y], backColors[z], leftColors[x]]));
-				//cols[x].push(index);
-				//rows[y].push(index);
-				//faces[z].push(index);
 				planes[0][x].push(index);
 				planes[1][y].push(index);
 				planes[2][z].push(index);
@@ -108,6 +105,8 @@ function Cube(position, planes, colors) {
 	this.origin = position;
 	this.curPos = planes;
 	this.angle = [0, 0, 0];
+	this.cubeAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+	this.nextAxes = this.cubeAxes;
 	this.colors = colors;
 	this.target = 0;
 	this.direction = 0;
@@ -117,20 +116,22 @@ function Cube(position, planes, colors) {
 Cube.prototype.render = function(x, y, z) {
 	tempMV = modelViewMatrix;  //backup modelViewMatrix
 	// Move to cube frame
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], [1, 0, 0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], [0, 1, 0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], [0, 0, 1] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], this.cubeAxes[2] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], this.cubeAxes[0] ));
+    modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], this.cubeAxes[1] ));
+    
 	
 	modelViewMatrix = mult(modelViewMatrix, translate(vec3(this.origin)));
 	
-	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[0], [1, 0, 0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[1], [0, 1, 0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[2], [0, 0, 1] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[2], this.cubeAxes[2] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[0], this.cubeAxes[0] ));
+    modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[1], this.cubeAxes[1] ));
+    
 	
 	//Rotate about axis
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], [1, 0, 0] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], [0, 1, 0] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], [0, 0, 1] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], this.cubeAxes[0] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], this.cubeAxes[1] ));
+	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], this.cubeAxes[2] ));
 	
 	var colorsArray = [];
 	for(var c in this.colors) {
@@ -163,6 +164,7 @@ Cube.prototype.animate = function(elapsedTime) {
 			//this.target = 0;
 			this.angle[this.axis] = this.angle[this.axis]%360;
 			this.direction=0;
+			this.cubeAxes = this.nextAxes;
 		}
 	//}
 };
@@ -185,22 +187,37 @@ function makeTurn(p, i, d) { //plane, index, direction
 		}
 		p1Index = rubiks[id].curPos[p1];
 		p2Index = rubiks[id].curPos[p2];
+		//console.log(p1);
+		p1Axis = rubiks[id].cubeAxes[p1];
+		
 		if(d=1) {
+			//rubiks[id].nextAxes[p1] = scale(-1, rubiks[id].cubeAxes[p2]);
+			//rubiks[id].nextAxes[p2] = p1Axis;
 			if(p1Index==0) {
 				console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
 				rubiks[id].curPos[p2]=0;
+				if(p2Index==1)
+					rubiks[id].curPos[p1]=1;
+				else
+					rubiks[id].curPos[p1]=(p2Index+2)%3;
 			}
 			if(p2Index==0) {
 				console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=2;
+				rubiks[id].curPos[p2]=p1Index;
 			}
 			if(p1Index==2) {
 				console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
 				rubiks[id].curPos[p2]=2;
+				if(p2Index==1)
+					rubiks[id].curPos[p1]=1;
+				else
+					rubiks[id].curPos[p1]=(p2Index+2)%3;
 			}
 			if(p2Index==2) {
 				console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=0;
+				rubiks[id].curPos[p2]=p1Index;
 			}
 		}
 	}
@@ -215,12 +232,22 @@ function evaluatePlanes() {
 		planes[1][rubiks[i].curPos[1]].push(i);
 		planes[2][rubiks[i].curPos[2]].push(i);
 	}
-	for (var i in planes) {
-		for (var j in planes[i]) {
-			if(planes[i][j].length != 9)
-				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
-		}
-	}
+// 	for (var i in planes) {
+// 		for (var j in planes[i]) {
+// 			if(planes[i][j].length != 9) {
+// 				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
+// 				console.log("Cubes in this plane:");
+// 				for(var k in planes[i][j])
+// 					console.log(planes[i][j][k]);
+// 			}
+// 		}
+// 	}
+// 	for (var i=0; i<9; i++)
+// 		debugPrintPlanes(i);
+}
+
+function debugPrintPlanes(i) {
+	console.log("Cube "+i+" col="+rubiks[i].curPos[0]+" row="+rubiks[i].curPos[1]+" face="+rubiks[i].curPos[2]);
 }
 
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
@@ -325,10 +352,11 @@ function setupUI() {
     };
     
     document.getElementById( "resetRot" ).onclick = function () {
-        camDirec =  [0,0,0];
-		rot = [0,0,0];
-		camSpeed = 0.01;
-		makeTurn(1, 1, 1)
+// camDirec =  [0,0,0];
+// 		rot = [0,0,0];
+// 		camSpeed = 0.01;
+		//animSpeed=0.1;
+		makeTurn(1, 0, 1);
     };
     document.getElementById( "tButton" ).onclick = function () {
 		makeTurn(0, 0, 1)
@@ -351,7 +379,9 @@ function setupUI() {
 		}
 	}
 	document.onkeyup = function() {
-		camSpeed=0.01;
+		//camSpeed=0.01;
+		camAccel = 0.2;
+		console.log(camSpeed);
 	}
 }
 
