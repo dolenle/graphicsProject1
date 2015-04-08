@@ -37,13 +37,13 @@ const up = vec3(0.0, 1.0, 0.0);
 
 //-----------NEW STUFF-------------------------------------------------------------------------------------
 
-var spacing = 0.45;
+var spacing = 0.5;
 var rubiks = [];
 var animationQueue = [[]];
 var animSpeed = 3;
 
 var camDirec = [0, 0, 0];
-var camAccel = 1.5;
+var camAccel = 1.05;
 var camSpeed = 0.5;
 
 var rows = [[],[],[]]; //rows of the rubiks cube
@@ -51,8 +51,10 @@ var cols = [[],[],[]]; //columns of the cube
 var faces = [[],[],[]];
 var planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
 
+var animRunning = 0;
+
 var cubeColors = [
-	vec4( 0.2, 0.2, 0.2, 1.0 ), //black
+	vec4( 0.2, 0.2, 0.2, 0.5 ), //black
 	vec4( 1.0, 0.0, 0.0, 1.0 ), //red
 	vec4( 1.0, 1.0, 0.0, 1.0 ), //yellow
 	vec4( 0.0, 0.6, 0.0, 1.0 ), //green
@@ -72,7 +74,7 @@ var Colors = {
 };
 
 var axis=0;
-var rot = [0,0,0];
+var rot = [0,30,0];
 var tempMV = mat4().create;
 
 function rubiksCube() {
@@ -106,32 +108,28 @@ function Cube(position, planes, colors) {
 	this.curPos = planes;
 	this.angle = [0, 0, 0];
 	this.cubeAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-	this.nextAxes = this.cubeAxes;
+	this.newAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 	this.colors = colors;
 	this.target = 0;
 	this.direction = 0;
 	this.axis = 0;
+	this.isAnimating = 0;
 }
 
 Cube.prototype.render = function(x, y, z) {
 	tempMV = modelViewMatrix;  //backup modelViewMatrix
 	// Move to cube frame
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], this.cubeAxes[2] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], this.cubeAxes[0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], this.cubeAxes[1] ));
-    
-	
+    for(var i=0; i<3; i++)  
+        modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[i], this.cubeAxes[i]));
+
 	modelViewMatrix = mult(modelViewMatrix, translate(vec3(this.origin)));
 	
-	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[2], this.cubeAxes[2] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[0], this.cubeAxes[0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[1], this.cubeAxes[1] ));
-    
-	
+	for(var i=2; i>=0; i--)  
+        modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[i], this.cubeAxes[i]));
+   
 	//Rotate about axis
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], this.cubeAxes[0] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], this.cubeAxes[1] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], this.cubeAxes[2] ));
+    for(var i=0; i<3; i++)  
+        modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[i], this.cubeAxes[i]));
 	
 	var colorsArray = [];
 	for(var c in this.colors) {
@@ -157,15 +155,22 @@ var effectiveFPMS = 60 / 1000;
 Cube.prototype.animate = function(elapsedTime) {
 	var animAngle = animSpeed * Math.round(effectiveFPMS * elapsedTime);
 	//for(var i in this.target) {
-		if(this.target != 0) {
+	if(this.isAnimating == 1) {
+		if(this.target > 1) {
 			this.angle[this.axis] += animAngle * this.direction;
 			this.target -= animAngle;
 		} else {
 			//this.target = 0;
-			this.angle[this.axis] = this.angle[this.axis]%360;
+			this.isAnimating = 0;
+			this.angle[this.axis] -= this.angle[this.axis]%90;
 			this.direction=0;
-			this.cubeAxes = this.nextAxes;
+			animRunning = 0;
+			for(var j=0; j<3; j++) {
+				//console.log("Replacing axis "+j+" with "+this.newAxes[j]);
+				this.cubeAxes[j] = this.newAxes[j];
+			}
 		}
+	}
 	//}
 };
     
@@ -173,28 +178,31 @@ var lastTime = 0;
 
 //plane: 0=column, 1=row, 2=face
 function makeTurn(p, i, d) { //plane, index, direction
-
-	var p1 = (p+1)%3; //other plane 1
-	var p2 = (p+2)%3; //other plane 2
-	//var tempPlane = new Array(planes[p]);
-	
-	for(var x in planes[p][i]) {
-		var id = planes[p][i][x];
-		if(rubiks[id].direction == 0) {
-			rubiks[id].axis = p;
-			rubiks[id].target=90;
-			rubiks[id].direction=d;
+	if(!animRunning) {
+		if(d==1) {
+			var p1 = (p+1)%3; //other plane 1
+			var p2 = (p+2)%3; //other plane 2
+		} else {
+			var p1 = (p+2)%3; //other plane 1
+			var p2 = (p+1)%3; //other plane 2
 		}
-		p1Index = rubiks[id].curPos[p1];
-		p2Index = rubiks[id].curPos[p2];
-		//console.log(p1);
-		p1Axis = rubiks[id].cubeAxes[p1];
+		//console.log("p1="+p1+" p2="+p2);
+
+		for(var x in planes[p][i]) {
+			var id = planes[p][i][x];
+			rubiks[id].axis = p;
+			rubiks[id].target = 90;
+			rubiks[id].direction = d;
+			rubiks[id].isAnimating = 1;
 		
-		if(d=1) {
-			//rubiks[id].nextAxes[p1] = scale(-1, rubiks[id].cubeAxes[p2]);
-			//rubiks[id].nextAxes[p2] = p1Axis;
+			var p1Index = rubiks[id].curPos[p1];
+			var p2Index = rubiks[id].curPos[p2];
+			var p1Axis = rubiks[id].cubeAxes[p1];
+			//rubiks[id].newAxes[p1] = scale(-1, rubiks[id].cubeAxes[p2]);
+			//rubiks[id].newAxes[p2] = p1Axis;
+		
 			if(p1Index==0) {
-				console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
+				//console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
 				rubiks[id].curPos[p2]=0;
 				if(p2Index==1)
 					rubiks[id].curPos[p1]=1;
@@ -202,12 +210,12 @@ function makeTurn(p, i, d) { //plane, index, direction
 					rubiks[id].curPos[p1]=(p2Index+2)%3;
 			}
 			if(p2Index==0) {
-				console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
+				//console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=2;
 				rubiks[id].curPos[p2]=p1Index;
 			}
 			if(p1Index==2) {
-				console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
+				//console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
 				rubiks[id].curPos[p2]=2;
 				if(p2Index==1)
 					rubiks[id].curPos[p1]=1;
@@ -215,14 +223,14 @@ function makeTurn(p, i, d) { //plane, index, direction
 					rubiks[id].curPos[p1]=(p2Index+2)%3;
 			}
 			if(p2Index==2) {
-				console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
+				//console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=0;
 				rubiks[id].curPos[p2]=p1Index;
 			}
 		}
+		evaluatePlanes(); //Refresh plane arrays
+		animRunning = 1;
 	}
-	
-	evaluatePlanes(); //Refresh plane arrays
 }
 
 function evaluatePlanes() {
@@ -352,36 +360,34 @@ function setupUI() {
     };
     
     document.getElementById( "resetRot" ).onclick = function () {
-// camDirec =  [0,0,0];
-// 		rot = [0,0,0];
-// 		camSpeed = 0.01;
-		//animSpeed=0.1;
-		makeTurn(1, 0, 1);
+		camDirec =  [0,0,0];
+		rot = [0,0,0];
+		camSpeed = 0.05;
     };
     document.getElementById( "tButton" ).onclick = function () {
-		makeTurn(0, 0, 1)
+		makeTurn(0, 0, 1);
+    };
+    document.getElementById( "tButton2" ).onclick = function () {
+		makeTurn(1, 0, 1);
+    };
+    document.getElementById( "tButton3" ).onclick = function () {
+		makeTurn(2, 0, 1);
     };
 	
 	document.onkeydown = function(event) {
-		switch(event.keyCode) {
-			case 37: //left arrow
-				camDirec[1]-=camSpeed*=camAccel;
-				break;
-			case 38: //up arrow
-				camDirec[0]-=camSpeed*=camAccel;
-				break;
-			case 39: //right arrow
-				camDirec[1]+=camSpeed*=camAccel;
-				break;
-			case 40: //down arrow
-				camDirec[0]+=camSpeed*=camAccel;
-				break;
+		if(event.keyCode > 36 && event.keyCode < 41) {
+			
+			var key = (event.keyCode-38)%2
+		if(key==0)
+			camDirec[Math.abs(key)]+=camSpeed*=camAccel*(event.keyCode-39);
+		else
+			camDirec[Math.abs(key)]+=(camSpeed*=camAccel)*key;
 		}
 	}
 	document.onkeyup = function() {
-		//camSpeed=0.01;
-		camAccel = 0.2;
-		console.log(camSpeed);
+		camSpeed=0.5;
+		//camAccel = 0.2;
+		//console.log(camSpeed);
 	}
 }
 
@@ -401,7 +407,7 @@ var render = function() {
 	}
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[0], [1, 0, 0] ));
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[1], [0, 1, 0] ));
-    modelViewMatrix = mult(modelViewMatrix, rotate(rot[2], [0, 0, 1] ));
+    //modelViewMatrix = mult(modelViewMatrix, rotate(rot[2], [0, 0, 1] ));
     
     projectionMatrix = perspective(fovy, aspect, near, far);
 	
