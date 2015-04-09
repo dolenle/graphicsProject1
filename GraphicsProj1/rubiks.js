@@ -39,7 +39,7 @@ const up = vec3(0.0, 1.0, 0.0);
 
 var spacing = 0.5;
 var rubiks = [];
-var animationQueue = [[]];
+var animationQueue = [];
 var animSpeed = 3;
 
 var camDirec = [0, 0, 0];
@@ -79,19 +79,18 @@ var tempMV = mat4().create;
 
 function rubiksCube() {
 	var index=0;
-	//Color Ordering: [front, right, bottom, top, back, left]
-	var c = [Colors.YELLOW, Colors.GREEN, Colors.RED, Colors.ORANGE, Colors.WHITE, Colors.GREEN];
-	var frontColors = [Colors.BLACK, Colors.BLACK, Colors.YELLOW];
+	//Color Ordering: [right, top, front, back, bottom, left]
 	var rightColors = [Colors.BLACK, Colors.BLACK, Colors.GREEN];
-	var bottomColors = [Colors.RED, Colors.BLACK, Colors.BLACK];
 	var topColors = [Colors.BLACK, Colors.BLACK, Colors.ORANGE];
+	var frontColors = [Colors.BLACK, Colors.BLACK, Colors.YELLOW];
 	var backColors = [Colors.WHITE, Colors.BLACK, Colors.BLACK];
+	var bottomColors = [Colors.RED, Colors.BLACK, Colors.BLACK];
 	var leftColors = [Colors.BLUE, Colors.BLACK, Colors.BLACK];
 	for(var x=0; x<3; x++) {
 		for(var y=0; y<3; y++) {
 			for(var z=0; z<3; z++) {
 				rubiks.push(new Cube([(x-1)*spacing, (y-1)*spacing, (z-1)*spacing, 1.0], [x, y, z],
-					[frontColors[z], rightColors[x], bottomColors[y], topColors[y], backColors[z], leftColors[x]]));
+					[rightColors[x], topColors[y], frontColors[z], backColors[z], bottomColors[y], leftColors[x]]));
 				planes[0][x].push(index);
 				planes[1][y].push(index);
 				planes[2][z].push(index);
@@ -108,8 +107,8 @@ function Cube(position, planes, colors) {
 	this.curPos = planes;
 	this.angle = [0, 0, 0];
 	this.cubeAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-	this.newAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 	this.colors = colors;
+	this.nextColors = new Array(colors);
 	this.target = 0;
 	this.direction = 0;
 	this.axis = 0;
@@ -119,36 +118,10 @@ function Cube(position, planes, colors) {
 Cube.prototype.render = function(x, y, z) {
 	tempMV = modelViewMatrix;  //backup modelViewMatrix
 	// Move to cube frame
-//     for(var i=0; i<3; i++)  
-//         modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[i], this.cubeAxes[i]));
-
-	var r = mat4();
-	r = mult(rotate(this.angle[2], [0, 0, 1]), r);
-	r = mult(rotate(this.angle[1], [-Math.sin(radians(this.angle[2])), Math.cos(radians(this.angle[2])), 0]), r);
-	r = mult(rotate(this.angle[0], [Math.cos(radians(this.angle[2]))*Math.cos(radians(this.angle[1])), Math.sin(radians(this.angle[2])), -Math.cos(radians(this.angle[2]))*Math.sin(radians(this.angle[1]))] ), r);
-	
-	modelViewMatrix = mult(modelViewMatrix, r);
-
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], [Math.cos(radians(this.angle[2]))*Math.cos(radians(this.angle[1])), Math.sin(radians(this.angle[2])), -Math.cos(radians(this.angle[2]))*Math.sin(radians(this.angle[1]))] ));
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], [-Math.sin(radians(this.angle[2])), Math.cos(radians(this.angle[2])), 0] ));
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], [0, 0, 1] ));
+    for(var i=0; i<3; i++)  
+        modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[i], this.cubeAxes[i]));
 
 	modelViewMatrix = mult(modelViewMatrix, translate(vec3(this.origin)));
-	
-// 	for(var i=2; i>=0; i--)  
-//         modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[i], this.cubeAxes[i]));
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[2], [0, 0, 1] ));
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[1], [-Math.sin(radians(this.angle[2])), Math.cos(radians(this.angle[2])), 0] ));
-// 	modelViewMatrix = mult(modelViewMatrix, rotate(-this.angle[0], [Math.cos(radians(this.angle[2]))*Math.cos(radians(this.angle[1])), Math.sin(radians(this.angle[2])), -Math.cos(radians(this.angle[2]))*Math.sin(radians(this.angle[1]))] ));
-
-	modelViewMatrix = mult(modelViewMatrix, transpose(r));
- 
-	//Rotate about axis
-//     for(var i=0; i<3; i++)  
-//         modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[i], this.cubeAxes[i]));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[0], [Math.cos(radians(this.angle[2]))*Math.cos(radians(this.angle[1])), Math.sin(radians(this.angle[2])), -Math.cos(radians(this.angle[2]))*Math.sin(radians(this.angle[1]))] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[1], [-Math.sin(radians(this.angle[2])), Math.cos(radians(this.angle[2])), 0] ));
-	modelViewMatrix = mult(modelViewMatrix, rotate(this.angle[2], [0, 0, 1] ));
 	
 	var colorsArray = [];
 	for(var c in this.colors) {
@@ -158,8 +131,8 @@ Cube.prototype.render = function(x, y, z) {
 	}
 	
     gl.bindBuffer( gl.ARRAY_BUFFER, cBuffer);
-	//gl.bufferSubData(gl.ARRAY_BUFFER, 0, flatten(colorsArray));
-	gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.DYNAMIC_DRAW );
+	gl.bufferSubData(gl.ARRAY_BUFFER, 0, flatten(colorsArray));
+	//gl.bufferData( gl.ARRAY_BUFFER, flatten(colorsArray), gl.DYNAMIC_DRAW );
 
     gl.bindBuffer( gl.ARRAY_BUFFER, vBuffer);
     gl.bufferData( gl.ARRAY_BUFFER, flatten(pointsArray), gl.STATIC_DRAW );
@@ -181,13 +154,10 @@ Cube.prototype.animate = function(elapsedTime) {
 		} else {
 			//this.target = 0;
 			this.isAnimating = 0;
-			this.angle[this.axis] -= this.angle[this.axis]%90;
+			this.angle = [0, 0, 0];
 			this.direction=0;
 			animRunning = 0;
-			for(var j=0; j<3; j++) {
-				//console.log("Replacing axis "+j+" with "+this.newAxes[j]);
-				this.cubeAxes[j] = this.newAxes[j];
-			}
+			//this.colors = new Array(this.nextColors);
 		}
 	}
 	//}
@@ -216,13 +186,26 @@ function makeTurn(p, i, d) { //plane, index, direction
 		
 			var p1Index = rubiks[id].curPos[p1];
 			var p2Index = rubiks[id].curPos[p2];
-			var p1Axis = rubiks[id].cubeAxes[p1];
-			//rubiks[id].newAxes[p1] = scale(-1, rubiks[id].cubeAxes[p2]);
-			//rubiks[id].newAxes[p2] = p1Axis;
-		
+			
+			var p1Color = rubiks[id].colors[p1];
+			var p1RColor = rubiks[id].colors[5-p1];
+// 			rubiks[id].nextColors[p1] = rubiks[id].colors[5-p2];
+// 			rubiks[id].nextColors[5-p1] = rubiks[id].colors[p2];
+// 			rubiks[id].nextColors[p2] = p1Color;
+// 			rubiks[id].nextColors[5-p2] = p1RColor;
+
 			if(p1Index==0) {
 				//console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
 				rubiks[id].curPos[p2]=0;
+				if(p2Index==1) {
+					rubiks[id].curPos[p1]=1;
+				} else {
+					rubiks[id].curPos[p1]=(p2Index+2)%3;
+					//rubiks[id].nextColors[p1] = rubiks[id].colors[p2];
+				}
+			} else if(p1Index==2) {
+				//console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
+				rubiks[id].curPos[p2]=2;
 				if(p2Index==1)
 					rubiks[id].curPos[p1]=1;
 				else
@@ -232,43 +215,40 @@ function makeTurn(p, i, d) { //plane, index, direction
 				//console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=2;
 				rubiks[id].curPos[p2]=p1Index;
-			}
-			if(p1Index==2) {
-				//console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
-				rubiks[id].curPos[p2]=2;
-				if(p2Index==1)
-					rubiks[id].curPos[p1]=1;
-				else
-					rubiks[id].curPos[p1]=(p2Index+2)%3;
-			}
-			if(p2Index==2) {
+			} else if(p2Index==2) {
 				//console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
 				rubiks[id].curPos[p1]=0;
 				rubiks[id].curPos[p2]=p1Index;
-			}
+			}		animRunning = 1;
+
 		}
-		evaluatePlanes(); //Refresh plane arrays
-		animRunning = 1;
+		//evaluatePlanes(); //Refresh plane arrays
 	}
 }
 
 function evaluatePlanes() {
 	planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
 	for (var i in rubiks) {
-		planes[0][rubiks[i].curPos[0]].push(i);
-		planes[1][rubiks[i].curPos[1]].push(i);
-		planes[2][rubiks[i].curPos[2]].push(i);
+// 		planes[0][rubiks[i].curPos[0]].push(i);
+// 		planes[1][rubiks[i].curPos[1]].push(i);
+// 		planes[2][rubiks[i].curPos[2]].push(i);
+		planes[0][rubiks[i].curPos[0]][3*rubiks[i].curPos[1]+rubiks[i].curPos[2]] = i;
+		planes[1][rubiks[i].curPos[1]][3*rubiks[i].curPos[0]+rubiks[i].curPos[2]] = i;
+		planes[2][rubiks[i].curPos[2]][3*rubiks[i].curPos[0]+rubiks[i].curPos[1]] = i;
 	}
-// 	for (var i in planes) {
-// 		for (var j in planes[i]) {
-// 			if(planes[i][j].length != 9) {
-// 				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
-// 				console.log("Cubes in this plane:");
-// 				for(var k in planes[i][j])
-// 					console.log(planes[i][j][k]);
-// 			}
-// 		}
-// 	}
+	//debug error checking
+	for (var i in planes) {
+		for (var j in planes[i]) {
+			if(planes[i][j].length != 9) {
+				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
+			}
+			for(var k in planes[i][j]) {
+				//console.log(planes[i][j][k]);
+				if(planes[i][j][k] == undefined)
+					console.log("Undefined index on planes["+i+"]["+j+"]["+k+"]");
+			}
+		}
+	}
 // 	for (var i=0; i<9; i++)
 // 		debugPrintPlanes(i);
 }
@@ -280,9 +260,9 @@ function debugPrintPlanes(i) {
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
 
 function quad(a, b, c, d) {
-	pointsArray.push(vertices[a]); 
-	pointsArray.push(vertices[b]); 
-	pointsArray.push(vertices[c]); 
+	pointsArray.push(vertices[a]);
+	pointsArray.push(vertices[b]);
+	pointsArray.push(vertices[c]);
 	pointsArray.push(vertices[a]); 
 	pointsArray.push(vertices[c]); 
 	pointsArray.push(vertices[d]); 
@@ -296,12 +276,12 @@ function quad(a, b, c, d) {
 
 function colorCube()
 {
-    quad( 1, 0, 3, 2 );
-    quad( 2, 3, 7, 6 );
-    quad( 3, 0, 4, 7 );
-    quad( 6, 5, 1, 2 );
-    quad( 4, 5, 6, 7 );
-    quad( 5, 4, 0, 1 );
+    quad( 2, 3, 7, 6 ); //right
+    quad( 6, 5, 1, 2 ); //top
+    quad( 1, 0, 3, 2 ); //front
+    quad( 4, 5, 6, 7 ); //back
+    quad( 3, 0, 4, 7 ); //bottom
+    quad( 5, 4, 0, 1 ); //left
 }
 
 var cBuffer;
@@ -384,13 +364,13 @@ function setupUI() {
 		camSpeed = 0.05;
     };
     document.getElementById( "tButton" ).onclick = function () {
-		makeTurn(0, 0, 1);
+		animationQueue.push([0, document.getElementById( "ind" ).value, document.getElementById( "dir" ).value]);
     };
     document.getElementById( "tButton2" ).onclick = function () {
-		makeTurn(1, 0, 1);
+		animationQueue.push([1, document.getElementById( "ind" ).value, document.getElementById( "dir" ).value]);
     };
     document.getElementById( "tButton3" ).onclick = function () {
-		makeTurn(2, 0, 1);
+		animationQueue.push([2, document.getElementById( "ind" ).value, document.getElementById( "dir" ).value]);
     };
 	
 	document.onkeydown = function(event) {
@@ -435,6 +415,10 @@ var render = function() {
     }
     
     //Perform Animations
+    if(!animRunning && animationQueue.length) {
+		var ani = animationQueue.pop();
+		makeTurn(ani[0], ani[1], ani[2]);
+	}
     var timeNow = new Date().getTime();
 	if (lastTime != 0) {
 		var elapsed = timeNow - lastTime;
