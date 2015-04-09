@@ -54,13 +54,13 @@ var planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
 var animRunning = 0;
 
 var cubeColors = [
-	vec4( 0.2, 0.2, 0.2, 0.5 ), //black
-	vec4( 1.0, 0.0, 0.0, 1.0 ), //red
-	vec4( 1.0, 1.0, 0.0, 1.0 ), //yellow
-	vec4( 0.0, 0.6, 0.0, 1.0 ), //green
-	vec4( 0.0, .0, 0.6, 1.0 ), //blue
-	vec4( 0.9, 0.9, 0.9, 1.0 ), //white
-	vec4( 1.0, 0.5, 0.0, 1.0 ), //orange
+	[ 0.2, 0.2, 0.2, 0.5 ], //black
+	[ 1.0, 0.0, 0.0, 1.0 ], //red
+	[ 1.0, 1.0, 0.0, 1.0 ], //yellow
+	[ 0.0, 0.6, 0.0, 1.0 ], //green
+	[ 0.0, 0.0, 0.6, 1.0 ], //blue
+	[ 0.9, 0.9, 0.9, 1.0 ], //white
+	[ 1.0, 0.5, 0.0, 1.0 ], //orange
 ];
 
 var Colors = {
@@ -98,7 +98,7 @@ function rubiksCube() {
 			}
 		}
 	}
-	evaluatePlanes();
+	//evaluatePlanes();
 	console.log("[rubiksCube]");
 }
 
@@ -108,7 +108,7 @@ function Cube(position, planes, colors) {
 	this.angle = [0, 0, 0];
 	this.cubeAxes = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
 	this.colors = colors;
-	this.nextColors = new Array(colors);
+	this.nextColors = colors.slice(0);
 	this.target = 0;
 	this.direction = 0;
 	this.axis = 0;
@@ -157,7 +157,8 @@ Cube.prototype.animate = function(elapsedTime) {
 			this.angle = [0, 0, 0];
 			this.direction=0;
 			animRunning = 0;
-			//this.colors = new Array(this.nextColors);
+			this.colors = this.nextColors.slice(0);
+			//console.log(this.colors);
 		}
 	}
 	//}
@@ -168,14 +169,12 @@ var lastTime = 0;
 //plane: 0=column, 1=row, 2=face
 function makeTurn(p, i, d) { //plane, index, direction
 	if(!animRunning) {
-		if(d==1) {
-			var p1 = (p+1)%3; //other plane 1
-			var p2 = (p+2)%3; //other plane 2
-		} else {
-			var p1 = (p+2)%3; //other plane 1
-			var p2 = (p+1)%3; //other plane 2
+		var p1 = (p+1)%3; //other plane 1
+		var p2 = (p+2)%3; //other plane 2
+		
+		if(p%2 != 0) {
+				p2 = [p1, p1 = p2][0];
 		}
-		//console.log("p1="+p1+" p2="+p2);
 
 		for(var x in planes[p][i]) {
 			var id = planes[p][i][x];
@@ -183,78 +182,53 @@ function makeTurn(p, i, d) { //plane, index, direction
 			rubiks[id].target = 90;
 			rubiks[id].direction = d;
 			rubiks[id].isAnimating = 1;
-		
+
 			var p1Index = rubiks[id].curPos[p1];
 			var p2Index = rubiks[id].curPos[p2];
 			
-			var p1Color = rubiks[id].colors[p1];
-			var p1RColor = rubiks[id].colors[5-p1];
-// 			rubiks[id].nextColors[p1] = rubiks[id].colors[5-p2];
-// 			rubiks[id].nextColors[5-p1] = rubiks[id].colors[p2];
-// 			rubiks[id].nextColors[p2] = p1Color;
-// 			rubiks[id].nextColors[5-p2] = p1RColor;
-
-			if(p1Index==0) {
-				//console.log("moving cube "+id+" from row 0 to face 0 (was on "+rubiks[id].curPos[p2]+")")
-				rubiks[id].curPos[p2]=0;
-				if(p2Index==1) {
-					rubiks[id].curPos[p1]=1;
-				} else {
-					rubiks[id].curPos[p1]=(p2Index+2)%3;
-					//rubiks[id].nextColors[p1] = rubiks[id].colors[p2];
+			//Compute new colors
+			if((p!=1 && d>0) || (p==1 && d<0)) {
+				if(p1Index==0) {
+					rubiks[id].nextColors[5-p1] = rubiks[planes[p][i][p2Index*3+2]].colors[p2];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][p2Index*3+2]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][p2Index*3+2]].colors[5-p]
+				} else if(p1Index==2) {
+					rubiks[id].nextColors[p1] = rubiks[planes[p][i][p2Index*3]].colors[5-p2];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][p2Index*3]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][p2Index*3]].colors[5-p];
 				}
-			} else if(p1Index==2) {
-				//console.log("moving cube "+id+" from row 2 to face 2 (was on "+rubiks[id].curPos[p2]+")")
-				rubiks[id].curPos[p2]=2;
-				if(p2Index==1)
-					rubiks[id].curPos[p1]=1;
-				else
-					rubiks[id].curPos[p1]=(p2Index+2)%3;
+				if(p2Index==0) {
+					rubiks[id].nextColors[5-p2] = rubiks[planes[p][i][-p1Index+2]].colors[5-p1];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][-p1Index+2]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][-p1Index+2]].colors[5-p];
+				} else if(p2Index==2) {
+					rubiks[id].nextColors[p2] = rubiks[planes[p][i][-p1Index+8]].colors[p1];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][-p1Index+8]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][-p1Index+8]].colors[5-p];
+				}
+			} else if((p!=1 && d<0) || (p==1 && d>0)) {
+				if(p1Index==0) {
+					rubiks[id].nextColors[5-p1] = rubiks[planes[p][i][(-p2Index+2)*3]].colors[5-p2];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][(-p2Index+2)*3]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][(-p2Index+2)*3]].colors[5-p];	
+				} else if(p1Index==2) {
+					rubiks[id].nextColors[p1] = rubiks[planes[p][i][(-p2Index+2)*3+2]].colors[p2];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][(-p2Index+2)*3+2]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][(-p2Index+2)*3+2]].colors[5-p];
+				}
+				if(p2Index==0) {
+					rubiks[id].nextColors[5-p2] = rubiks[planes[p][i][p1Index+6]].colors[p1];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][p1Index+6]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][p1Index+6]].colors[5-p]
+				} else if(p2Index==2) {
+					rubiks[id].nextColors[p2] = rubiks[planes[p][i][p1Index]].colors[5-p1];
+					rubiks[id].nextColors[p] = rubiks[planes[p][i][p1Index]].colors[p];
+					rubiks[id].nextColors[5-p] = rubiks[planes[p][i][p1Index]].colors[5-p];
+				}
 			}
-			if(p2Index==0) {
-				//console.log("moving cube "+id+" from face 0 to row 2 (was on "+rubiks[id].curPos[p1]+")")
-				rubiks[id].curPos[p1]=2;
-				rubiks[id].curPos[p2]=p1Index;
-			} else if(p2Index==2) {
-				//console.log("moving cube "+id+" from face 2 to row 0 (was on "+rubiks[id].curPos[p1]+")")
-				rubiks[id].curPos[p1]=0;
-				rubiks[id].curPos[p2]=p1Index;
-			}		animRunning = 1;
-
-		}
-		//evaluatePlanes(); //Refresh plane arrays
-	}
-}
-
-function evaluatePlanes() {
-	planes = [[[],[],[]], [[],[],[]], [[],[],[]]];
-	for (var i in rubiks) {
-// 		planes[0][rubiks[i].curPos[0]].push(i);
-// 		planes[1][rubiks[i].curPos[1]].push(i);
-// 		planes[2][rubiks[i].curPos[2]].push(i);
-		planes[0][rubiks[i].curPos[0]][3*rubiks[i].curPos[1]+rubiks[i].curPos[2]] = i;
-		planes[1][rubiks[i].curPos[1]][3*rubiks[i].curPos[0]+rubiks[i].curPos[2]] = i;
-		planes[2][rubiks[i].curPos[2]][3*rubiks[i].curPos[0]+rubiks[i].curPos[1]] = i;
-	}
-	//debug error checking
-	for (var i in planes) {
-		for (var j in planes[i]) {
-			if(planes[i][j].length != 9) {
-				console.log("Incorrect length ("+planes[i][j].length+") in planes["+i+"]["+j+"]");
-			}
-			for(var k in planes[i][j]) {
-				//console.log(planes[i][j][k]);
-				if(planes[i][j][k] == undefined)
-					console.log("Undefined index on planes["+i+"]["+j+"]["+k+"]");
-			}
+			animRunning = 1;
 		}
 	}
-// 	for (var i=0; i<9; i++)
-// 		debugPrintPlanes(i);
-}
-
-function debugPrintPlanes(i) {
-	console.log("Cube "+i+" col="+rubiks[i].curPos[0]+" row="+rubiks[i].curPos[1]+" face="+rubiks[i].curPos[2]);
 }
 
 //-----------END NEW STUFF--------------------------------------------------------------------------------------------------
