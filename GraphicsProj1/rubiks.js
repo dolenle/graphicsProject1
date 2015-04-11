@@ -75,28 +75,7 @@ var axis=0;
 
 var tempMV = mat4().create;
 
-function checkSolve() {
-	var sideColor;
-	for (var i in planes) { //check
-		for (var j in planes[i]) {
-			if(j==0) {
-				sideColor = rubiks[planes[i][j][0]].nextColors[5-i];
-				for(var k in planes[i][j])
-					if(rubiks[planes[i][j][k]].nextColors[5-i]!=sideColor) {
-						return false;
-					}
-			} else if(j==2) {
-				sideColor = rubiks[planes[i][j][0]].nextColors[i];
-				for(var k in planes[i][j])
-					if(rubiks[planes[i][j][k]].nextColors[i]!=sideColor) {
-						return false;
-					}
-			}
-		}
-	}
-	return true;
-}
-
+//Create a rubiks cube by combining 27 cubes
 function rubiksCube() {
 	var index=0;
 	//Color Ordering: [right, top, front, back, bottom, left]
@@ -169,7 +148,6 @@ Cube.prototype.render = function(x, y, z) {
 //Cube animation step
 Cube.prototype.animate = function(elapsedTime) {
 	var animAngle = animSpeed * Math.round(0.06 * elapsedTime);
-	//for(var i in this.target) {
 	if(this.isAnimating == 1) {
 		if(this.target > 1) {
 			this.angle[this.axis] += animAngle * this.direction;
@@ -182,7 +160,6 @@ Cube.prototype.animate = function(elapsedTime) {
 			this.colors = this.nextColors.slice(0);
 		}
 	}
-	//}
 };
     
 var lastTime = 0;
@@ -196,7 +173,7 @@ function makeTurn(data) { //plane, index, direction
 		var p1 = (p+1)%3; //other plane 1
 		var p2 = (p+2)%3; //other plane 2
 		
-		if(p%2 != 0) { //swap p1/p2 for y-axis
+		if(p%2 != 0) { //swap p1/p2 for y-axis rotation
 			p2 = [p1, p1 = p2][0];
 		}
 
@@ -207,10 +184,10 @@ function makeTurn(data) { //plane, index, direction
 			rubiks[id].direction = d;
 			rubiks[id].isAnimating = 1;
 
-			var p1Index = rubiks[id].curPos[p1];
-			var p2Index = rubiks[id].curPos[p2];
+			var p1Index = rubiks[id].curPos[p1]; //Cubes p1 location
+			var p2Index = rubiks[id].curPos[p2]; //Cubes p2 location
 			
-			//Compute new colors
+			//Compute new colors based on p1 and p2
 			if((p!=1 && d>0) || (p==1 && d<0)) {
 				if(p1Index==0) {
 					rubiks[id].nextColors[5-p1] = rubiks[planes[p][i][p2Index*3+2]].colors[p2];
@@ -253,16 +230,38 @@ function makeTurn(data) { //plane, index, direction
 			animRunning = 1;
 		}
 	}
-	if(checkSolve()) {
+	if(checkSolve()) { //check if puzzle is solved
 		$("#notify").slideDown();
 	} else {
 		$("#notify").fadeOut();
 	}
 }
 
+function checkSolve() {
+	var sideColor;
+	for (var i in planes) { //for each dimension
+		for (var j in planes[i]) {
+			if(j==0) {
+				sideColor = rubiks[planes[i][j][0]].nextColors[5-i];
+				for(var k in planes[i][j])
+					if(rubiks[planes[i][j][k]].nextColors[5-i]!=sideColor) {
+						return false;
+					}
+			} else if(j==2) {
+				sideColor = rubiks[planes[i][j][0]].nextColors[i];
+				for(var k in planes[i][j])
+					if(rubiks[planes[i][j][k]].nextColors[i]!=sideColor) {
+						return false;
+					}
+			}
+		}
+	}
+	return true;
+}
+
 function getRelativePlane(p, i, d) {
 	return [p, i, d];
-//NOT COMPLETE
+//--------------------NOT COMPLETE; PLEASE IGNORE------------------
 // 	var newPlanes = [0,1,2];
 // 	var newIndex = i;
 // 	var newDirec = d;
@@ -303,7 +302,7 @@ function getRelativePlane(p, i, d) {
 // 	return [newPlanes[p],newIndex,newDirec];
 }
 
-function quad(a, b, c, d) {
+function quad(a, b, c, d) { //create one face of the cube
 	pointsArray.push(vertices[a]);
 	pointsArray.push(vertices[b]);
 	pointsArray.push(vertices[c]);
@@ -378,8 +377,7 @@ window.onload = function init() {
 }
 
 function setupUI() {
-	//event handlers
-	$('#accordion').accordion();
+	$('#accordion').accordion(); //Jquery
 	document.getElementById("zFarSlider").onchange = function(event) {
         far = event.target.value;
     };
@@ -401,22 +399,22 @@ function setupUI() {
     document.getElementById("fovSlider").onchange = function(event) {
         fovy = event.target.value;
     };
-    document.getElementById( "resetRot" ).onclick = function () {
+    $("#resetRot").click(function() {
 		rot = [0,0,0];
 		camSpeed = [0,0,0];
-    };
-    document.getElementById("tButton").onclick = function () {
+    });
+    $("#tButton").click(function() {
 		animationQueue.push([0, document.getElementById( "ind" ).value,
 		document.getElementById( "dir" ).value]);
-    };
-    document.getElementById("tButton2").onclick = function () {
+    });
+    $("#tButton2").click(function() {
 		animationQueue.push([1, document.getElementById( "ind" ).value,
 		document.getElementById( "dir" ).value]);
-    };
-    document.getElementById("tButton3").onclick = function () {
+    });
+    $("#tButton3").click(function() {
 		animationQueue.push([2, document.getElementById( "ind" ).value,
 		document.getElementById( "dir" ).value]);
-    };
+    });
     
     $("#hide_notify").click(function() {
     	$("#notify").slideUp();
@@ -426,14 +424,15 @@ function setupUI() {
     	$("#error_msg").slideUp();
     });
     
-     $("#gen_rand").click(function() {
+    //Generate random commands
+    $("#gen_rand").click(function() {
      	var cmds = ["F","B","U","D","L","R","f","b","u","d","l","r"];
      	var end = $("#rand_num").val();
      	if($.isNumeric(end)) {
 			$("#rand_txt").val(""); //clear text
 			for(var i=0; i < end; i++) {
 				$("#rand_txt").val($("#rand_txt").val()+cmds[Math.round(11*Math.random())]);
-				if(Math.round(Math.random())) {
+				if(Math.random() > 0.5) {
 					$("#rand_txt").val($("#rand_txt").val()+"'");
 				}
 			}
@@ -461,34 +460,33 @@ function setupUI() {
 		saveAs(new Blob([JSON.stringify(data)], {type: "text/plain;"}), ($("#file_name").val()+".txt" || "cube.txt"));
     });
     
-	$("#load_save").on("change", function() {
+	$("#load_save").on("change", function() { //read a savefile
 		var reader = new FileReader();
 		reader.onload = function() {
 			var data 
 			try {
 				data = JSON.parse(reader.result);
-				console.log(data.length);
 				if(data.length == 27) {
 					var id = 0;
 					for(var i in data) {
 						if(data[i].length==6) {
 							rubiks[id].colors=data[i];
-						} else {
+						} else { //Incorrect length
 							$("#error_msg").slideDown();
 							return;
 						}
 					id++;
 					}
-				} else {
+				} else { //Incorrect length
 					$("#error_msg").slideDown();
 					return;
 				}
-			} catch(e) {
+			} catch(e) { //not JSON
 				$("#error_msg").slideDown();
 				return;
 			}
 		}
-		if(!this.files[0]) {
+		if(!this.files[0]) { //no file available
 			$("#error_msg").slideDown();
 		} else {
 			reader.readAsText(this.files[0]);
@@ -528,14 +526,16 @@ function setupUI() {
 	}
 }
 
+//get +1/-1 sign of number
 function sign(x) { return (x >> 31) + (x > 0 ? 1 : 0); }
 
+//Get commands from input
 function runCommands() {
-	//get commands text and remove smart quotes
 	if(!$("#cmd_txt").val()) {
 		$("#error_msg").slideDown();
 	} else {
 		$("#error_msg").slideUp();
+			//get commands text and remove smart quotes
 		var txt=$("#cmd_txt").val().replace( /\u2018|\u2019|\u201A|\uFFFD/g, "'" );
 		var regex = /[FBUDLRfbudlr]'?/g;
 		var commands=txt.match(regex).reverse();
@@ -603,7 +603,6 @@ var render = function() {
     rot[1]+=(camSpeed[1]*=sign(camSpeed[1])*camAccel[1]);
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[0], [1, 0, 0] ));
     modelViewMatrix = mult(modelViewMatrix, rotate(rot[1], [0, 1, 0] ));
-    //modelViewMatrix = mult(modelViewMatrix, rotate(rot[2], [0, 0, 1] ));
     
     projectionMatrix = perspective(fovy, aspect, near, far);
 	
@@ -611,11 +610,12 @@ var render = function() {
     	rubiks[i].render(0, 0, 0);
     }
     
-    //Perform Animations
+    //Perform Moves
     if(!animRunning && animationQueue.length) {
 		var ani = animationQueue.pop();
 		makeTurn(getRelativePlane(ani[0], ani[1], ani[2]));
 	}
+	//Perform Animations
     var timeNow = new Date().getTime();
 	if (lastTime != 0) {
 		var elapsed = timeNow - lastTime;
@@ -624,6 +624,6 @@ var render = function() {
 		}
 	}
 	lastTime = timeNow;
-    requestAnimFrame(render);
+    requestAnimFrame(render); //recursive
 }
 
